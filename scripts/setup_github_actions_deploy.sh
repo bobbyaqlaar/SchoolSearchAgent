@@ -57,6 +57,16 @@ grant_role roles/iam.serviceAccountUser
 grant_role roles/artifactregistry.writer
 grant_role roles/secretmanager.secretAccessor
 grant_role roles/storage.admin
+grant_role roles/serviceusage.serviceUsageConsumer
+
+echo "Enabling required GCP APIs…"
+gcloud services enable \
+  cloudresourcemanager.googleapis.com \
+  run.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  secretmanager.googleapis.com \
+  --quiet
 
 if ! gcloud iam workload-identity-pools describe "$POOL_ID" \
   --location=global >/dev/null 2>&1; then

@@ -62,9 +62,9 @@ steps:
     args:
       - -ceu
       - |
-        API_URL="$(cat /workspace/api_url.txt)"
+        API_URL="$$(cat /workspace/api_url.txt)"
         docker build \
-          --build-arg "NEXT_PUBLIC_API_BASE_URL=${API_URL}" \
+          --build-arg "NEXT_PUBLIC_API_BASE_URL=$${API_URL}" \
           -t "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest" \
           -f web/Dockerfile \
           web
@@ -93,14 +93,14 @@ steps:
           --min-instances=0 \
           --max-instances=10 \
           --quiet
-        WEB_URL="$(gcloud run services describe dubai-web \
-          --project="$PROJECT_ID" \
+        WEB_URL="$$(gcloud run services describe dubai-web \
+          --project="$$PROJECT_ID" \
           --region="${_REGION}" \
           --format='value(status.url)')"
         gcloud run services update dubai-api \
-          --project="$PROJECT_ID" \
+          --project="$$PROJECT_ID" \
           --region="${_REGION}" \
-          --update-env-vars="CORS_ORIGINS=${WEB_URL}" \
+          --update-env-vars="CORS_ORIGINS=$${WEB_URL}" \
           --quiet
 
 options:
