@@ -89,18 +89,29 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Submit Cloud Build deploy
+      - name: Deploy to production
         env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+          DEPLOY_WEBHOOK_TOKEN: ${{ secrets.DEPLOY_WEBHOOK_TOKEN }}
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           GCP_REGION: ${{ secrets.GCP_REGION }}
           GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           NEO4J_URI: ${{ secrets.NEO4J_URI }}
         run: |
-          REGION="${GCP_REGION:-me-central1}"
-          gcloud config set project "$GCP_PROJECT_ID"
-          gcloud builds submit \
-            --project="$GCP_PROJECT_ID" \
-            --region="$REGION" \
-            --service-account="projects/${GCP_PROJECT_ID}/serviceAccounts/${GCP_SERVICE_ACCOUNT}" \
-            --config=deploy/cloudbuild-ci-deploy.yaml \
-            --substitutions="_REGION=${REGION},_REPO=dubai,_NEO4J_URI=${NEO4J_URI}"
+          if [[ -n "${DEPLOY_WEBHOOK_URL}" && -n "${DEPLOY_WEBHOOK_TOKEN}" ]]; then
+            echo "Deploying via webhook…"
+            curl -fsS -X POST "${DEPLOY_WEBHOOK_URL}" \
+              -H "Authorization: Bearer ${DEPLOY_WEBHOOK_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{\"ref\":\"${GITHUB_REF}\",\"repo\":\"${GITHUB_REPOSITORY}\",\"sha\":\"${GITHUB_SHA}\"}"
+          else
+            echo "Deploying via WIF Cloud Build submit…"
+            REGION="${GCP_REGION:-me-central1}"
+            gcloud config set project "$GCP_PROJECT_ID"
+            gcloud builds submit \
+              --project="$GCP_PROJECT_ID" \
+              --region="$REGION" \
+              --service-account="projects/${GCP_PROJECT_ID}/serviceAccounts/${GCP_SERVICE_ACCOUNT}" \
+              --config=deploy/cloudbuild-ci-deploy.yaml \
+              --substitutions="_REGION=${REGION},_REPO=dubai,_NEO4J_URI=${NEO4J_URI}"
+          fi

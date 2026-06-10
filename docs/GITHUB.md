@@ -63,6 +63,8 @@ Settings → **Secrets and variables** → **Actions** → **New repository secr
 | `GCP_PROJECT_ID` | `deploy-production` | GCP project id |
 | `GCP_REGION` | `deploy-production` | Default `me-central1` if omitted in workflow |
 | `NEO4J_URI` | `deploy-production` | Aura Bolt URI (`neo4j+s://…`) |
+| `DEPLOY_WEBHOOK_URL` | `deploy-production` (optional) | Cloud Build webhook or relay URL — `./scripts/setup_deploy_webhook.sh` |
+| `DEPLOY_WEBHOOK_TOKEN` | `deploy-production` (optional) | Bearer token for webhook deploy |
 
 **One-shot setup (recommended):**
 
@@ -71,7 +73,13 @@ unset GITHUB_TOKEN          # GitHub Models token shadows gh auth
 ./scripts/setup_github_actions_deploy.sh
 ```
 
-Optional Cloud Build webhook (if supported in your region): `./scripts/setup_deploy_webhook.sh` sets `DEPLOY_WEBHOOK_URL` + `DEPLOY_WEBHOOK_TOKEN`.
+Optional deploy webhook (native Cloud Build or Cloud Run relay fallback):
+
+```bash
+./scripts/setup_deploy_webhook.sh
+```
+
+Sets `DEPLOY_WEBHOOK_URL` + `DEPLOY_WEBHOOK_TOKEN`. When present, CI uses the webhook; otherwise it falls back to WIF + `gcloud builds submit`.
 
 The **`unit-tests`** and **`frontend`** jobs need no secrets.
 
@@ -88,7 +96,7 @@ Workflow: [`.github/workflows/llm_regression_tests.yml`](../.github/workflows/ll
 | `unit-tests` | `uv run pytest -v` | Required |
 | `frontend` | `npm test` + `npm run build` | Required |
 | `llm-evals` | `uv run python -m evals.eval_parsing` | Required (after unit-tests); **`ci_gate`** enforces score thresholds |
-| `deploy-production` | `gcloud builds submit deploy/cloudbuild-ci-deploy.yaml` | **`main` only**, all jobs green |
+| `deploy-production` | Webhook curl or `gcloud builds submit deploy/cloudbuild-ci-deploy.yaml` | **`main` only**, all jobs green |
 
 See [ARCHITECTURE §5.3](ARCHITECTURE.md#53-layer-c--deploy-gate-ci_gate) for how `ci_gate` works.
 
