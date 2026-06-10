@@ -6,7 +6,7 @@ Portfolio app: multi-agent KHDA school search over a shared Neo4j graph, multi-L
 
 This document serves as the complete functional blueprint, structural data model, testing architecture, and automated continuous delivery matrix for the enterprise-grade Dubai School Analytics Graph Platform.
 
-> **New here?** Use **[§9 Operations Guide](#9-operations-guide--deploy-start-stop--refresh)** below for step-by-step deploy, startup, shutdown, and reload of each tier (web, API, Neo4j) locally and on Google Cloud. The [User Manual](docs/USER_MANUAL.md) adds troubleshooting and evaluation workflows. See [Architecture](docs/ARCHITECTURE.md) for requirements and design. **Publishing to GitHub:** [docs/GITHUB.md](docs/GITHUB.md).
+> **New here?** Use **[§9 Operations Guide](#9-operations-guide--deploy-start-stop--refresh)** below for step-by-step deploy, startup, shutdown, and reload of each tier (web, API, Neo4j) locally and on Google Cloud. The [User Manual](docs/USER_MANUAL.md) adds troubleshooting and evaluation workflows. See [Architecture](docs/ARCHITECTURE.md) for requirements and design. **CI/CD:** [§7](#7-continuous-integration--delivery-automation) (GitHub Actions → Cloud Run, live on `main`). **Publishing to GitHub:** [docs/GITHUB.md](docs/GITHUB.md).
 
 ---
 
@@ -345,57 +345,68 @@ volumes:
 
 ## 7. Continuous Integration & Delivery Automation
 
-GitHub Actions (`.github/workflows/llm_regression_tests.yml`) runs on every PR and merge to `main`:
+**Status:** GitHub Actions CI/CD is **live and green** on [`main`](https://github.com/bobbyaqlaar/SchoolSearchAgent/actions). Every merge runs tests + LangSmith parsing eval, then auto-deploys API and web to Cloud Run in `me-central1`.
 
-```yaml
-name: CI — Unit, Frontend & LLM Evals
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-jobs:
-  unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv python install
-      - run: uv sync --frozen --extra providers --extra evals
-      - run: uv run pytest -v
-  frontend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - run: npm install && npm test && npm run build
-        env:
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
-  llm-evals:
-    runs-on: ubuntu-latest
-    needs: unit-tests
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv python install
-      - run: uv sync --frozen --extra providers --extra evals
-      - run: uv run python -m evals.eval_parsing
-        env:
-          LANGCHAIN_TRACING_V2: "true"
-          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-          LANGCHAIN_PROJECT: "dubai-graph-sync-agent"
-  deploy-production:
-    needs: [unit-tests, frontend, llm-evals]
-    if: github.ref == 'refs/heads/main'
-    # ... webhook deploy step
+Workflow: [`.github/workflows/llm_regression_tests.yml`](.github/workflows/llm_regression_tests.yml)
+
+```text
+  push / PR to main
+      │
+      ├─► unit-tests      — uv run pytest -v (mocked, no API keys)
+      ├─► frontend        — npm test + production build (Vitest)
+      └─► llm-evals       — evals/eval_parsing + ci_gate (needs LANGCHAIN_API_KEY)
+              │
+              ▼ (main branch only, all three jobs green)
+         deploy-production
+              │
+              ├─► [preferred] POST DEPLOY_WEBHOOK_URL (Bearer token)
+              │       └── Cloud Run relay dubai-deploy-webhook
+              │             → gcloud builds submit deploy/cloudbuild-ci-deploy.yaml
+              │
+              └─► [fallback] WIF auth + gcloud builds submit (same pipeline)
+                      └── build/push API → deploy dubai-api → build/push web → deploy dubai-web → CORS update
 ```
 
+| Job | Runs on | Secrets needed | Purpose |
+| --- | --- | --- | --- |
+| `unit-tests` | Every PR + push | None | Backend regression (158+ pytest cases) |
+| `frontend` | Every PR + push | None | Vitest + Next.js production build |
+| `llm-evals` | Every PR + push (after unit) | `LANGCHAIN_API_KEY` | Open-data parsing eval; **`ci_gate`** blocks on score thresholds |
+| `deploy-production` | **`main` / `master` only** | WIF secrets and/or webhook secrets | Promote to Cloud Run after all gates pass |
+
 The parsing eval needs **LangSmith only** — no LLM provider API key.
+
+### 7.1 One-shot CI/CD setup (GCP + GitHub)
+
+From repo root (requires `gcloud`, `gh`, Aura `NEO4J_URI` in `.env`):
+
+```bash
+unset GITHUB_TOKEN                    # GitHub Models token shadows gh auth
+./scripts/setup_github_actions_deploy.sh   # WIF + GCP_* + NEO4J_URI secrets
+./scripts/setup_deploy_webhook.sh          # optional: DEPLOY_WEBHOOK_* (recommended)
+```
+
+| Script | Creates / sets |
+| --- | --- |
+| `setup_github_actions_deploy.sh` | Workload Identity pool, `github-actions-deploy` SA, GitHub secrets for WIF deploy |
+| `setup_deploy_webhook.sh` | Native Cloud Build webhook (if region supports) **or** Cloud Run relay `dubai-deploy-webhook`; sets `DEPLOY_WEBHOOK_URL` + `DEPLOY_WEBHOOK_TOKEN` |
+
+Full secret list and branch protection: [docs/GITHUB.md](docs/GITHUB.md).
+
+### 7.2 Deploy pipeline artifact
+
+CI and webhook relay both use [`deploy/cloudbuild-ci-deploy.yaml`](deploy/cloudbuild-ci-deploy.yaml) — full stack redeploy (API image → `dubai-api` → resolve API URL → web image with baked `NEXT_PUBLIC_API_BASE_URL` → `dubai-web` → update API `CORS_ORIGINS`).
+
+Manual equivalent from laptop: `./scripts/gcp_deploy.sh` (same outcome, local `.env` secrets).
+
+### 7.3 Production URLs (after deploy)
+
+```bash
+gcloud run services describe dubai-web --region=me-central1 --format='value(status.url)'   # school finder UI
+gcloud run services describe dubai-api --region=me-central1 --format='value(status.url)'   # REST API
+```
+
+The deploy webhook URL (`dubai-deploy-webhook …/deploy`) is **CI-only** (POST + Bearer token) — not the public app.
 
 ---
 
@@ -426,6 +437,15 @@ uv run python -m evals.eval_parsing --skip-ci-gate
 
 # Launch the REST API locally
 uv run uvicorn api_service:app --reload
+```
+
+**CI/CD setup scripts** (once per GCP project + GitHub repo):
+
+```bash
+./scripts/setup_github_actions_deploy.sh   # WIF + deploy secrets
+./scripts/setup_deploy_webhook.sh          # optional webhook relay + DEPLOY_WEBHOOK_*
+./scripts/gcp_deploy.sh                    # manual full-stack Cloud Run deploy
+./scripts/gcp_sync_job.sh                  # optional scheduled sync job
 ```
 
 ---
@@ -623,6 +643,7 @@ Recommended cloud layout:
 | API | Cloud Run | `dubai-api` |
 | Graph DB | Neo4j Aura | `neo4j+s://….databases.neo4j.io` |
 | Nightly sync (optional) | Cloud Run Job | `dubai-sync` |
+| CI deploy relay (optional) | Cloud Run | `dubai-deploy-webhook` |
 | Images | Artifact Registry | `me-central1-docker.pkg.dev/PROJECT/dubai/` |
 
 #### Prerequisites (once)
@@ -718,6 +739,8 @@ Cloud Run services listen on **port 8080** internally (`dubai-api` Uvicorn, `dub
 
 Re-running `./scripts/gcp_deploy.sh` redeploys **both** API and web with latest code.
 
+**Automated deploy (recommended):** merge to `main` — GitHub Actions runs pytest, frontend tests, parsing eval + `ci_gate`, then deploys via webhook or WIF (see [§7](#7-continuous-integration--delivery-automation)). First-time GCP/GitHub wiring: `./scripts/setup_github_actions_deploy.sh` and optionally `./scripts/setup_deploy_webhook.sh`.
+
 #### Stop — whole stack
 
 Removes public URLs and stops Cloud Run billing for those services:
@@ -744,7 +767,7 @@ Cloud Run scales to **zero** when idle by default (`min-instances=0`); deleting 
 
 | Goal | Action |
 | --- | --- |
-| **Redeploy API + web after code change** | `./scripts/gcp_deploy.sh` |
+| **Redeploy API + web after code change** | Merge to `main` (CI auto-deploy) **or** `./scripts/gcp_deploy.sh` |
 | **Refresh school data in Aura** | `uv run python -m dubai` (local, `.env` → Aura) or run `dubai-sync` job |
 | **Update secrets** | Edit `.env`, re-run deploy script (re-uploads secrets) |
 | **Verify live** | `curl -fsS https://YOUR_API_URL/api/facets` and open web URL |
@@ -819,5 +842,5 @@ Apple Silicon: Neo4j community supports `linux/arm64`. For local LLM inference, 
 | Secrets | **Secret Manager** | Inject API keys + Neo4j credentials at runtime. |
 | Images | **Artifact Registry** | Stores backend + frontend container images. |
 
-Prefer `./scripts/gcp_deploy.sh` over manual `gcloud run deploy` steps. CI from §7 builds and tests on merge to `main`; wire `DEPLOY_WEBHOOK_URL` for automated promotion.
+Prefer `./scripts/gcp_deploy.sh` for manual laptop deploys. **CI from [§7](#7-continuous-integration--delivery-automation)** runs on every merge to `main`: tests → eval gate → Cloud Run promotion via WIF and/or deploy webhook (`deploy/cloudbuild-ci-deploy.yaml`).
 

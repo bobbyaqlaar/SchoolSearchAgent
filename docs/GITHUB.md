@@ -98,6 +98,8 @@ Workflow: [`.github/workflows/llm_regression_tests.yml`](../.github/workflows/ll
 | `llm-evals` | `uv run python -m evals.eval_parsing` | Required (after unit-tests); **`ci_gate`** enforces score thresholds |
 | `deploy-production` | Webhook curl or `gcloud builds submit deploy/cloudbuild-ci-deploy.yaml` | **`main` only**, all jobs green |
 
+**Verified:** All four jobs pass on `main`; deploy promotes `dubai-api` + `dubai-web` to Cloud Run after eval gate.
+
 See [ARCHITECTURE §5.3](ARCHITECTURE.md#53-layer-c--deploy-gate-ci_gate) for how `ci_gate` works.
 
 ---
@@ -112,7 +114,8 @@ See [ARCHITECTURE §5.3](ARCHITECTURE.md#53-layer-c--deploy-gate-ci_gate) for ho
 
 ## 7. After publish
 
-- Run CI on the first push; fix any failures before inviting collaborators.
+- Confirm CI is green on the first push to `main` ([Actions tab](https://github.com/bobbyaqlaar/SchoolSearchAgent/actions)).
+- Wire deploy once: `./scripts/setup_github_actions_deploy.sh` and optionally `./scripts/setup_deploy_webhook.sh` (see [§4](#4-github-actions-secrets)).
 - For manual GCP deploy from your laptop, see [README §9.4](../README.md#94-production--google-cloud-cloud-run--neo4j-aura) — `./scripts/gcp_deploy.sh`.
 
 ---

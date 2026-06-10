@@ -184,7 +184,8 @@ flowchart LR
 | Config | pydantic-settings | `dubai/settings.py` |
 | Packaging | uv + hatchling | `pyproject.toml`, `uv.lock` |
 | Containers | Docker Compose | `docker-compose.yml`, `Dockerfile`, `web/Dockerfile` |
-| Cloud prod | Cloud Run, Artifact Registry, Secret Manager, Aura | `scripts/gcp_deploy.sh`, `scripts/gcp_sync_job.sh`, `deploy/cloudbuild-api.yaml`, `deploy/cloudbuild-web.yaml` |
+| Cloud prod | Cloud Run, Artifact Registry, Secret Manager, Aura | `scripts/gcp_deploy.sh`, `scripts/gcp_sync_job.sh`, `deploy/cloudbuild-api.yaml`, `deploy/cloudbuild-web.yaml`, `deploy/cloudbuild-ci-deploy.yaml`, `deploy/webhook-relay/` |
+| CI/CD | GitHub Actions → Cloud Build → Cloud Run | `.github/workflows/llm_regression_tests.yml`, `scripts/setup_github_actions_deploy.sh`, `scripts/setup_deploy_webhook.sh` |
 
 **GCP secrets** (Secret Manager → Cloud Run `dubai-api`): `neo4j-pass`, `github-token`, `openai-key`, `google-key`, `groq-key`, `langchain-key`. See README §9.4 for the env-var mapping.
 
@@ -303,6 +304,8 @@ The **development harness** is the toolchain and CI pipeline that keeps applicat
 
 ### 3.2 CI harness (GitHub Actions)
 
+**Status:** Live on `main` — all four jobs pass; merge to `main` auto-deploys `dubai-api` + `dubai-web` to Cloud Run (`me-central1`).
+
 Workflow: `.github/workflows/llm_regression_tests.yml`
 
 ```text
@@ -310,18 +313,36 @@ Workflow: `.github/workflows/llm_regression_tests.yml`
       │
       ├─► unit-tests (pytest, mocked)
       ├─► frontend (vitest + production build)
-      └─► llm-evals (LangSmith parsing regression, needs unit-tests)
+      └─► llm-evals (LangSmith parsing regression + ci_gate, needs unit-tests)
               │
               ▼ (main branch only, all jobs green)
-         deploy-production webhook
+         deploy-production
+              │
+              ├─► webhook path (when DEPLOY_WEBHOOK_* secrets set)
+              │       POST → dubai-deploy-webhook Cloud Run relay
+              │       → downloads main tarball → gcloud builds submit
+              │
+              └─► WIF fallback (google-github-actions/auth + gcloud builds submit)
+                      → deploy/cloudbuild-ci-deploy.yaml (full stack)
 ```
 
 | Job | Gate | What it protects |
 | --- | --- | --- |
 | `unit-tests` | Required | Schemas, guardrails, router, API routes, agent nodes, eval logic |
 | `frontend` | Required | UI regressions; build-time env (`NEXT_PUBLIC_API_BASE_URL`) |
-| `llm-evals` | Required (after unit) | Open-data parsing quality against seed dataset |
-| `deploy-production` | Gated | No deploy until tests + evals pass |
+| `llm-evals` | Required (after unit) | Open-data parsing quality against seed dataset; **`ci_gate`** enforces thresholds |
+| `deploy-production` | **`main` only** | No Cloud Run promotion until tests + evals pass |
+
+**Setup scripts** (run once per repo/GCP project):
+
+| Script | Purpose |
+| --- | --- |
+| `scripts/setup_github_actions_deploy.sh` | Workload Identity Federation, `github-actions-deploy` SA, GitHub secrets (`GCP_*`, `NEO4J_URI`) |
+| `scripts/setup_deploy_webhook.sh` | Native Cloud Build webhook (region-dependent) **or** Cloud Run relay `dubai-deploy-webhook`; sets `DEPLOY_WEBHOOK_URL` + `DEPLOY_WEBHOOK_TOKEN` |
+
+**Deploy artifact:** `deploy/cloudbuild-ci-deploy.yaml` — build/push API → deploy `dubai-api` → resolve URL → build/push web → deploy `dubai-web` → patch API CORS. Same pipeline for webhook relay and WIF submit.
+
+See [GITHUB.md](GITHUB.md) for secrets and branch protection.
 
 This is the **application build harness**: every merge candidate is compiled, unit-tested, UI-tested, and LLM-regression-tested before promotion.
 
@@ -492,7 +513,13 @@ flowchart TB
   LangSmith parsing eval + ci_gate ──fail──► stop
       │ pass (main only)
       ▼
-  deploy webhook → Cloud Run / Compose refresh
+  deploy-production
+      │
+      ├─► webhook POST (DEPLOY_WEBHOOK_URL) → Cloud Run relay → Cloud Build
+      └─► or WIF gcloud builds submit → deploy/cloudbuild-ci-deploy.yaml
+              │
+              ▼
+         dubai-api + dubai-web on Cloud Run (CORS updated)
 ```
 
 GitHub Actions (`.github/workflows/llm_regression_tests.yml`) runs `uv run python -m evals.eval_parsing` in the `llm-evals` job with `LANGCHAIN_API_KEY` from repo secrets. No LLM provider key is required — eval exercises the **deterministic Excel parser**, not Ask.
@@ -582,6 +609,6 @@ Dashboard: [smith.langchain.com](https://smith.langchain.com) → project **`dub
 | --- | --- |
 | **What it must do** | Ingest KHDA data → graph → search / compare / ask UI (with preflight scope guards + min/max budget semantics) |
 | **What it is built from** | Next.js + FastAPI + LangGraph sync + LangChain Ask + Neo4j + multi-provider LLM router |
-| **Dev build harness** | uv, pytest, Vitest, hybrid dev or Docker Compose, GitHub Actions CI, `gcp_deploy.sh` |
+| **Dev build harness** | uv, pytest, Vitest, hybrid dev or Docker Compose, **GitHub Actions CI/CD (live)**, `gcp_deploy.sh`, setup scripts |
 | **Prod agent harness** | LangGraph sync (cron/Cloud Run Jobs) + LangChain Ask (Cloud Run API), guardrails, LangSmith |
-| **Evaluation & self-correction** | Runtime validation → LangSmith dataset feedback → CI regression + `ci_gate` → deploy gate |
+| **Evaluation & self-correction** | Runtime validation → LangSmith dataset feedback → CI regression + `ci_gate` → **auto-deploy gate on `main`** |

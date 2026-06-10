@@ -133,6 +133,15 @@ if [[ -z "$WEBHOOK_URL" ]]; then
     --project="$GCP_PROJECT_ID" \
     --region="$GCP_REGION" \
     --format='value(status.url)')"
+  WEB_APP_URL="$(gcloud run services describe dubai-web \
+    --project="$GCP_PROJECT_ID" \
+    --region="$GCP_REGION" \
+    --format='value(status.url)' 2>/dev/null || true)"
+  gcloud run services update "$RELAY_SERVICE" \
+    --project="$GCP_PROJECT_ID" \
+    --region="$GCP_REGION" \
+    --update-env-vars="WEB_APP_URL=${WEB_APP_URL}" \
+    --quiet >/dev/null 2>&1 || true
   WEBHOOK_URL="${RELAY_BASE}/deploy"
 fi
 

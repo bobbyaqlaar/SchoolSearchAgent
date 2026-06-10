@@ -41,6 +41,20 @@ def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/")
+@app.get("/deploy")
+def deploy_info() -> dict[str, str]:
+    app_url = os.environ.get("WEB_APP_URL", "").strip()
+    info: dict[str, str] = {
+        "service": "SchoolSearchAgent deploy webhook",
+        "usage": "POST /deploy with Authorization: Bearer <token>",
+        "note": "CI deploy endpoint — not the public school finder app.",
+    }
+    if app_url:
+        info["appUrl"] = app_url
+    return info
+
+
 @app.post("/")
 @app.post("/deploy")
 def deploy(

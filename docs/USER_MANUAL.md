@@ -519,12 +519,36 @@ gcloud scheduler jobs create http dubai-sync-trigger \
 
 ### 9.4 CI/CD from GitHub
 
-`.github/workflows/llm_regression_tests.yml` on merge to `main`:
+**Status:** Pipeline is **operational** — merge to `main` runs all checks then deploys to Cloud Run.
 
-1. Runs pytest, frontend tests, parsing eval
-2. Calls `DEPLOY_WEBHOOK_URL` (configure repo secrets)
+Workflow: [`.github/workflows/llm_regression_tests.yml`](../.github/workflows/llm_regression_tests.yml)
 
-Required secrets: `LANGCHAIN_API_KEY`, `DEPLOY_WEBHOOK_URL`, `DEPLOY_WEBHOOK_TOKEN`.
+| Step | Job | What runs |
+| --- | --- | --- |
+| 1 | `unit-tests` | `uv run pytest -v` |
+| 2 | `frontend` | `npm test` + `npm run build` |
+| 3 | `llm-evals` | `uv run python -m evals.eval_parsing` + **`ci_gate`** |
+| 4 | `deploy-production` | Webhook POST **or** WIF + `gcloud builds submit deploy/cloudbuild-ci-deploy.yaml` |
+
+**One-time setup** (from repo root):
+
+```bash
+unset GITHUB_TOKEN
+./scripts/setup_github_actions_deploy.sh    # WIF + GCP secrets (required for deploy)
+./scripts/setup_deploy_webhook.sh           # optional; recommended — sets DEPLOY_WEBHOOK_*
+```
+
+| Secret | Required? | Set by |
+| --- | --- | --- |
+| `LANGCHAIN_API_KEY` | Yes (eval job) | Manual in GitHub → Settings → Secrets |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `GCP_PROJECT_ID`, `GCP_REGION`, `NEO4J_URI` | Yes (WIF deploy fallback) | `setup_github_actions_deploy.sh` |
+| `DEPLOY_WEBHOOK_URL`, `DEPLOY_WEBHOOK_TOKEN` | Optional (preferred deploy path) | `setup_deploy_webhook.sh` |
+
+When webhook secrets are present, CI POSTs to `dubai-deploy-webhook` (Cloud Run relay in `me-central1`); otherwise CI authenticates via WIF and submits the same Cloud Build config directly.
+
+Details: [GITHUB.md](GITHUB.md) · [ARCHITECTURE §3.2](ARCHITECTURE.md#32-ci-harness-github-actions) · [README §7](../README.md#7-continuous-integration--delivery-automation).
+
+**Note:** The webhook URL is for CI deploy triggers only (POST + Bearer token). Open **`dubai-web`** for the school finder UI.
 
 ### 9.5 Verify production (GCP)
 
