@@ -1,0 +1,70 @@
+# USD per 1,000 tokens (list-price estimates). Edit when providers change rates.
+# Loaded by dubai.model_pricing — override path with MODEL_PRICING_PATH in .env.
+
+gpt-4o:
+  input_per_1k: 0.0025
+  output_per_1k: 0.010
+
+gpt-4o-mini:
+  input_per_1k: 0.00015
+  output_per_1k: 0.0006
+
+claude-3-5-sonnet:
+  input_per_1k: 0.003
+  output_per_1k: 0.015
+
+gemini-1.5-pro:
+  input_per_1k: 0.00125
+  output_per_1k: 0.005
+
+gemini-1.5-flash:
+  input_per_1k: 0.000075
+  output_per_1k: 0.0003
+
+qwen-2.5-72b-instruct:
+  input_per_1k: 0.00059
+  output_per_1k: 0.00079
+
+deepseek-v3:
+  input_per_1k: 0.00027
+  output_per_1k: 0.0011
+
+deepseek-r1:
+  input_per_1k: 0.00055
+  output_per_1k: 0.00219
+
+grok-2-beta-foundation:
+  input_per_1k: 0.002
+  output_per_1k: 0.010
+
+grok-2-beta-fast:
+  input_per_1k: 0.002
+  output_per_1k: 0.010
+
+llama-3.1:
+  input_per_1k: 0.0
+  output_per_1k: 0.0
+
+llama-3.3:
+  input_per_1k: 0.0
+  output_per_1k: 0.0
+
+gemma-2:
+  input_per_1k: 0.0
+  output_per_1k: 0.0
+
+github:gpt-4o-mini:
+  input_per_1k: 0.0
+  output_per_1k: 0.0
+
+github:gpt-4o:
+  input_per_1k: 0.0
+  output_per_1k: 0.0
+
+github:llama-3.3-70b:
+  input_per_1k: 0.0
+  output_per_1k: 0.0
+
+github:deepseek-v3:
+  input_per_1k: 0.0
+  output_per_1k: 0.0

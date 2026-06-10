@@ -1,0 +1,20 @@
+# Strings matched against LangSmith model-price-map `match_pattern` (regex).
+# Used when SYNC_LANGSMITH_PRICING=true at API startup.
+
+gpt-4o: gpt-4o
+gpt-4o-mini: gpt-4o-mini
+claude-3-5-sonnet: claude-3-5-sonnet-latest
+gemini-1.5-pro: gemini-1.5-pro
+gemini-1.5-flash: gemini-1.5-flash
+qwen-2.5-72b-instruct: qwen-2.5-72b-instruct
+deepseek-v3: deepseek-chat
+deepseek-r1: deepseek-reasoner
+grok-2-beta-foundation: grok-4.3
+grok-2-beta-fast: grok-4.20-0309-non-reasoning
+llama-3.1: llama3.1
+llama-3.3: llama3.3
+gemma-2: gemma2
+github:gpt-4o-mini: gpt-4o-mini
+github:gpt-4o: gpt-4o
+github:llama-3.3-70b: llama-3.3-70b-instruct
+github:deepseek-v3: deepseek-chat

@@ -1,0 +1,27 @@
+# Build and push the web image (deploy is done by scripts/gcp_deploy.sh after push).
+substitutions:
+  _REGION: me-central1
+  _REPO: dubai
+  _API_URL: http://localhost:8000
+
+steps:
+  - id: build-web
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg
+      - NEXT_PUBLIC_API_BASE_URL=${_API_URL}
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$BUILD_ID
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest
+      - -f
+      - web/Dockerfile
+      - web
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$BUILD_ID
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

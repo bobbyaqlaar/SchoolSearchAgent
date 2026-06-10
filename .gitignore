@@ -1,0 +1,38 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+.env.local
+!.env.example
+
+# Node / Next.js
+web/node_modules/
+web/.next/
+web/out/
+
+# Open-data cache (downloaded at runtime)
+dubai_open_data_cache/
+
+# Runtime artifacts
+logs/
+dubai_backup.csv
+dubai_backup.xlsx
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Cursor (local agent metadata)
+.cursor/
