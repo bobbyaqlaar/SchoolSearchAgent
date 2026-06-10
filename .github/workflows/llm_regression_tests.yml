@@ -93,6 +93,7 @@ jobs:
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           GCP_REGION: ${{ secrets.GCP_REGION }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           NEO4J_URI: ${{ secrets.NEO4J_URI }}
         run: |
           REGION="${GCP_REGION:-me-central1}"
@@ -100,5 +101,6 @@ jobs:
           gcloud builds submit \
             --project="$GCP_PROJECT_ID" \
             --region="$REGION" \
+            --service-account="projects/${GCP_PROJECT_ID}/serviceAccounts/${GCP_SERVICE_ACCOUNT}" \
             --config=deploy/cloudbuild-ci-deploy.yaml \
             --substitutions="_REGION=${REGION},_REPO=dubai,_NEO4J_URI=${NEO4J_URI}"
