@@ -6,8 +6,28 @@ import pytest
 def test_known_models_listed():
     from dubai.llm_router import MODEL_REGISTRY, list_models
 
-    assert "gpt-4o" in list_models()
-    assert len(MODEL_REGISTRY) >= 13
+    expected = {
+        "gpt-4o",
+        "gpt-4o-mini",
+        "claude-3-5-sonnet",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+        "qwen-2.5-72b-instruct",
+        "deepseek-v3",
+        "deepseek-r1",
+        "grok-2-beta-foundation",
+        "grok-2-beta-fast",
+        "llama-3.1",
+        "llama-3.3",
+        "gemma-2",
+        "github:gpt-4o-mini",
+        "github:gpt-4o",
+        "github:llama-3.3-70b",
+        "github:deepseek-v3",
+    }
+    listed = set(list_models())
+    assert expected <= listed
+    assert len(MODEL_REGISTRY) == len(expected)
 
 
 def test_github_models_present():

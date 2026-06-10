@@ -180,7 +180,12 @@ def _local(model_name: str) -> Callable[..., "BaseChatModel"]:
                 api_key="not-needed",
                 **overrides,
             )
-        from langchain_ollama import ChatOllama
+        try:
+            from langchain_ollama import ChatOllama
+        except ImportError as error:
+            raise ImportError(
+                "Local Ollama provider not installed — run: uv sync --extra providers"
+            ) from error
 
         return ChatOllama(
             model=model_name,
@@ -195,21 +200,19 @@ def _local(model_name: str) -> Callable[..., "BaseChatModel"]:
 MODEL_REGISTRY: dict[str, ModelSpec] = {
     "gpt-4o": ModelSpec("openai", _openai("gpt-4o")),
     "gpt-4o-mini": ModelSpec("openai", _openai("gpt-4o-mini")),
- #   "claude-3-5-sonnet": ModelSpec(
- #       "anthropic", _anthropic("claude-3-5-sonnet-latest")
- #   ),
+    "claude-3-5-sonnet": ModelSpec(
+        "anthropic", _anthropic("claude-3-5-sonnet-latest")
+    ),
     "gemini-1.5-pro": ModelSpec("google", _google("gemini-2.0-flash")),
     "gemini-1.5-flash": ModelSpec("google", _google("gemini-2.0-flash")),
-    "qwen-2.5-72b-instruct": ModelSpec(
-        "groq", _groq("qwen/qwen3-32b")
-    ),
- #   "deepseek-v3": ModelSpec("deepseek", _deepseek("deepseek-chat")),
- #   "deepseek-r1": ModelSpec("deepseek", _deepseek("deepseek-reasoner")),
+    "qwen-2.5-72b-instruct": ModelSpec("groq", _groq("qwen/qwen3-32b")),
+    "deepseek-v3": ModelSpec("deepseek", _deepseek("deepseek-chat")),
+    "deepseek-r1": ModelSpec("deepseek", _deepseek("deepseek-reasoner")),
     "grok-2-beta-foundation": ModelSpec("xai", _xai("grok-4.3")),
     "grok-2-beta-fast": ModelSpec("xai", _xai("grok-4.20-0309-non-reasoning")),
- #   "llama-3.1": ModelSpec("local", _local("llama3.1")),
- #   "llama-3.3": ModelSpec("local", _local("llama3.3")),
- #   "gemma-2": ModelSpec("local", _local("gemma2")),
+    "llama-3.1": ModelSpec("local", _local("llama3.1")),
+    "llama-3.3": ModelSpec("local", _local("llama3.3")),
+    "gemma-2": ModelSpec("local", _local("gemma2")),
     "github:gpt-4o-mini": ModelSpec("github", _github("openai/gpt-4o-mini")),
     "github:gpt-4o": ModelSpec("github", _github("openai/gpt-4o")),
     "github:llama-3.3-70b": ModelSpec(

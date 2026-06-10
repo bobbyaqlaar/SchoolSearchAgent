@@ -81,7 +81,9 @@ The Neo4j database topology enforces strict entity constraints to block data dup
     *   **Groq** (registry id `qwen-2.5-72b-instruct`; upstream `qwen/qwen3-32b`): open-source API tier
     *   **xAI Grok** (registry ids; upstream `grok-4.3`, `grok-4.20-0309-non-reasoning`): `grok-2-beta-foundation`, `grok-2-beta-fast`
     *   **GitHub Models** (free dev tier; `parallel_tool_calls=False` for multi-tool stability): `github:gpt-4o-mini`, `github:gpt-4o`, `github:llama-3.3-70b`, `github:deepseek-v3`
-    *   **Optional** (uncomment in `dubai/llm_router.py` when keys/backends are configured): Anthropic `claude-3-5-sonnet`, DeepSeek `deepseek-v3` / `deepseek-r1`, local Ollama/vLLM `llama-3.1` / `llama-3.3`, `gemma-2`
+    *   **Anthropic**: `claude-3-5-sonnet` (needs `ANTHROPIC_API_KEY`)
+    *   **DeepSeek**: `deepseek-v3`, `deepseek-r1` (needs `DEEPSEEK_API_KEY`)
+    *   **Local Ollama/vLLM**: `llama-3.1`, `llama-3.3`, `gemma-2` (needs Ollama or vLLM at `LOCAL_LLM_BASE_URL`)
 
 ### Real-Time Evaluation & Quality Constraints
 1. **Ingestion guardrails**: Intercept 100% of parsed sync payloads at the application perimeter via `validate_school()` before committing database changes.
