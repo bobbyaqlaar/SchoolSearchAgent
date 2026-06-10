@@ -1,4 +1,7 @@
 # Dubai Private Education Knowledge Graph Pipeline & REST Microservice
+
+Portfolio app: multi-agent KHDA school search over a shared Neo4j graph, multi-LLM router, containerised for local Mac and GCP.
+
 ## System Engineering Specification (Phase 1 & Phase 2 Consolidated)
 
 This document serves as the complete functional blueprint, structural data model, testing architecture, and automated continuous delivery matrix for the enterprise-grade Dubai School Analytics Graph Platform.

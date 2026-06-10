@@ -24,6 +24,7 @@ dubai_open_data_cache/
 logs/
 dubai_backup.csv
 dubai_backup.xlsx
+khda_backup.csv
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
