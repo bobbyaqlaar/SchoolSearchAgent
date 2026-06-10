@@ -20,7 +20,7 @@ Related: [README](../README.md) · [USER_MANUAL](USER_MANUAL.md) · [ARCHITECTUR
 ## 2. Create the repository on GitHub
 
 1. GitHub → **New repository** (empty — no README, no `.gitignore`; this repo already has them).
-2. Note the remote URL, e.g. `git@github.com:YOUR_ORG/schoolSearchAgent.git`.
+2. Note the remote URL, e.g. `git@github.com:YOUR_ORG/SchoolSearchAgent.git`.
 
 ---
 
@@ -38,14 +38,14 @@ git status              # confirm .env is NOT listed
 git commit -m "Initial commit: KHDA school search platform"
 
 git branch -M main
-git remote add origin git@github.com:YOUR_ORG/schoolSearchAgent.git
+git remote add origin git@github.com:YOUR_ORG/SchoolSearchAgent.git
 git push -u origin main
 ```
 
 If the repo already has a remote:
 
 ```bash
-git remote set-url origin git@github.com:YOUR_ORG/schoolSearchAgent.git
+git remote set-url origin git@github.com:YOUR_ORG/SchoolSearchAgent.git
 git push -u origin main
 ```
 
@@ -58,8 +58,20 @@ Settings → **Secrets and variables** → **Actions** → **New repository secr
 | Secret | Required for | Notes |
 | --- | --- | --- |
 | `LANGCHAIN_API_KEY` | `llm-evals` job + `ci_gate` | LangSmith API key — parsing eval fails without it |
-| `DEPLOY_WEBHOOK_URL` | `deploy-production` on `main` | Optional until you wire auto-deploy |
-| `DEPLOY_WEBHOOK_TOKEN` | `deploy-production` | Bearer token for webhook |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `deploy-production` | WIF provider — `./scripts/setup_github_actions_deploy.sh` |
+| `GCP_SERVICE_ACCOUNT` | `deploy-production` | CI deploy service account email |
+| `GCP_PROJECT_ID` | `deploy-production` | GCP project id |
+| `GCP_REGION` | `deploy-production` | Default `me-central1` if omitted in workflow |
+| `NEO4J_URI` | `deploy-production` | Aura Bolt URI (`neo4j+s://…`) |
+
+**One-shot setup (recommended):**
+
+```bash
+unset GITHUB_TOKEN          # GitHub Models token shadows gh auth
+./scripts/setup_github_actions_deploy.sh
+```
+
+Optional Cloud Build webhook (if supported in your region): `./scripts/setup_deploy_webhook.sh` sets `DEPLOY_WEBHOOK_URL` + `DEPLOY_WEBHOOK_TOKEN`.
 
 The **`unit-tests`** and **`frontend`** jobs need no secrets.
 
@@ -76,7 +88,7 @@ Workflow: [`.github/workflows/llm_regression_tests.yml`](../.github/workflows/ll
 | `unit-tests` | `uv run pytest -v` | Required |
 | `frontend` | `npm test` + `npm run build` | Required |
 | `llm-evals` | `uv run python -m evals.eval_parsing` | Required (after unit-tests); **`ci_gate`** enforces score thresholds |
-| `deploy-production` | POST to deploy webhook | **`main` only**, all jobs green |
+| `deploy-production` | `gcloud builds submit deploy/cloudbuild-ci-deploy.yaml` | **`main` only**, all jobs green |
 
 See [ARCHITECTURE §5.3](ARCHITECTURE.md#53-layer-c--deploy-gate-ci_gate) for how `ci_gate` works.
 
@@ -93,7 +105,7 @@ See [ARCHITECTURE §5.3](ARCHITECTURE.md#53-layer-c--deploy-gate-ci_gate) for ho
 ## 7. After publish
 
 - Run CI on the first push; fix any failures before inviting collaborators.
-- For GCP production deploy, see [README §9.4](../README.md#94-production--google-cloud-cloud-run--neo4j-aura) — deploy from your machine with `./scripts/gcp_deploy.sh`, not from GitHub unless you add a dedicated workflow.
+- For manual GCP deploy from your laptop, see [README §9.4](../README.md#94-production--google-cloud-cloud-run--neo4j-aura) — `./scripts/gcp_deploy.sh`.
 
 ---
 

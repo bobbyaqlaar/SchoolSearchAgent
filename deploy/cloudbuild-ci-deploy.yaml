@@ -1,0 +1,107 @@
+# Full Cloud Run redeploy (API → web → CORS). Invoked by the GitHub Actions
+# deploy-production job via a Cloud Build webhook trigger.
+substitutions:
+  _REGION: me-central1
+  _REPO: dubai
+  _NEO4J_URI: ""
+
+steps:
+  - id: build-api
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:latest
+      - -f
+      - Dockerfile
+      - .
+
+  - id: push-api
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:latest
+
+  - id: deploy-api
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        gcloud run deploy dubai-api \
+          --project="$PROJECT_ID" \
+          --image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:latest" \
+          --region="${_REGION}" \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8080 \
+          --command=uv \
+          --args=run,uvicorn,api_service:app,--host,0.0.0.0,--port,8080 \
+          --memory=512Mi \
+          --cpu=1 \
+          --min-instances=0 \
+          --max-instances=10 \
+          --set-secrets=NEO4J_PASSWORD=neo4j-pass:latest,GITHUB_TOKEN=github-token:latest,OPENAI_API_KEY=openai-key:latest,GOOGLE_API_KEY=google-key:latest,GROQ_API_KEY=groq-key:latest,LANGCHAIN_API_KEY=langchain-key:latest \
+          --set-env-vars="NEO4J_URI=${_NEO4J_URI},NEO4J_USER=neo4j,CORS_ORIGINS=http://localhost:3000,LANGCHAIN_TRACING_V2=true,LANGCHAIN_PROJECT=dubai-graph-sync-agent,SYNC_LANGSMITH_PRICING=false,SYNC_LANGSMITH_PRICING_WRITE=false" \
+          --quiet
+
+  - id: resolve-api-url
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        gcloud run services describe dubai-api \
+          --project="$PROJECT_ID" \
+          --region="${_REGION}" \
+          --format='value(status.url)' > /workspace/api_url.txt
+
+  - id: build-web
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        API_URL="$(cat /workspace/api_url.txt)"
+        docker build \
+          --build-arg "NEXT_PUBLIC_API_BASE_URL=${API_URL}" \
+          -t "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest" \
+          -f web/Dockerfile \
+          web
+
+  - id: push-web
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest
+
+  - id: deploy-web
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        gcloud run deploy dubai-web \
+          --project="$PROJECT_ID" \
+          --image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest" \
+          --region="${_REGION}" \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8080 \
+          --memory=512Mi \
+          --cpu=1 \
+          --min-instances=0 \
+          --max-instances=10 \
+          --quiet
+        WEB_URL="$(gcloud run services describe dubai-web \
+          --project="$PROJECT_ID" \
+          --region="${_REGION}" \
+          --format='value(status.url)')"
+        gcloud run services update dubai-api \
+          --project="$PROJECT_ID" \
+          --region="${_REGION}" \
+          --update-env-vars="CORS_ORIGINS=${WEB_URL}" \
+          --quiet
+
+options:
+  logging: CLOUD_LOGGING_ONLY
