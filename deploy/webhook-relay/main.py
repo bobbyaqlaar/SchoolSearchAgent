@@ -76,6 +76,13 @@ def deploy(
                 top = members[0].name.split("/", 1)[0]
                 archive.extractall(workdir)
             source_root = os.path.join(workdir, top)
+            config_path = os.path.join(source_root, "deploy", "cloudbuild-ci-deploy.yaml")
+            if not os.path.isfile(config_path):
+                listing = ", ".join(sorted(os.listdir(source_root))[:20])
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing cloudbuild config under {source_root}: {listing}",
+                )
 
         submit_cmd: list[str] = [
             "gcloud",
@@ -87,17 +94,17 @@ def deploy(
             f"--substitutions=_REGION={region},_REPO={repo_name},_NEO4J_URI={neo4j_uri}",
             "--async",
             "--format=value(id)",
+            ".",
         ]
         if deploy_sa:
-            submit_cmd.append(
-                f"--service-account=projects/{project_id}/serviceAccounts/{deploy_sa}"
-            )
+            submit_cmd.insert(-1, f"--service-account=projects/{project_id}/serviceAccounts/{deploy_sa}")
 
         proc = subprocess.run(
-            submit_cmd + [source_root],
+            submit_cmd,
             check=False,
             capture_output=True,
             text=True,
+            cwd=source_root,
         )
         if proc.returncode != 0:
             detail = (proc.stderr or proc.stdout or "gcloud builds submit failed").strip()

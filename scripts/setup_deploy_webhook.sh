@@ -97,6 +97,11 @@ if [[ -z "$WEBHOOK_URL" ]]; then
   grant_role roles/storage.admin
   grant_role roles/serviceusage.serviceUsageConsumer
 
+  gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_SA_EMAIL" \
+    --member="serviceAccount:${RELAY_SA_EMAIL}" \
+    --role="roles/iam.serviceAccountUser" \
+    --quiet >/dev/null 2>&1 || true
+
   IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_REPO}/deploy-webhook-relay:latest"
   gcloud builds submit deploy/webhook-relay \
     --tag="$IMAGE" \
