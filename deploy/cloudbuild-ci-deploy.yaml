@@ -93,12 +93,12 @@ steps:
           --min-instances=0 \
           --max-instances=10 \
           --quiet
-        WEB_URL="$$(gcloud run services describe dubai-web \
-          --project="$$PROJECT_ID" \
+        WEB_URL="$(gcloud run services describe dubai-web \
+          --project="$PROJECT_ID" \
           --region="${_REGION}" \
           --format='value(status.url)')"
         gcloud run services update dubai-api \
-          --project="$$PROJECT_ID" \
+          --project="$PROJECT_ID" \
           --region="${_REGION}" \
           --update-env-vars="CORS_ORIGINS=$${WEB_URL}" \
           --quiet
